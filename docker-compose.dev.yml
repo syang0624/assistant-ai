@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+    backend:
+        build:
+            context: ./backend
+        container_name: assistant-ai-backend-dev
+        command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        ports:
+            - "8000:8000"
+        volumes:
+            - ./backend:/app # 로컬 코드를 컨테이너 /app에 마운트 (핫리로드)
