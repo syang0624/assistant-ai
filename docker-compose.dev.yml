@@ -9,3 +9,4 @@ services:
             - "8000:8000"
         volumes:
             - ./backend:/app # 로컬 코드를 컨테이너 /app에 마운트 (핫리로드)
+

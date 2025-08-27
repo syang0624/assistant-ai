@@ -14,15 +14,20 @@ def hash_password(plain: str) -> str:
     return pwd_context.hash(plain)
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return pwd_context.verify(plain, hashed)
+    except Exception:
+        # If hash verification fails, return False instead of crashing
+        return False
 
 @router.post("/signup", response_model=OkOut)
 def signup(body: SignUp, db: Session = Depends(get_session)):
     if db.query(User).filter(User.username == body.username).first():
         raise HTTPException(status_code=400, detail="Username already exists")
+    
     user = User(
         username=body.username,
-        password_hash=hash_password(body.password),  # ✅ 해시 저장
+        password_hash=hash_password(body.password),
     )
     db.add(user)
     db.commit()
@@ -31,6 +36,10 @@ def signup(body: SignUp, db: Session = Depends(get_session)):
 @router.post("/login", response_model=OkOut)
 def login(body: LoginIn, db: Session = Depends(get_session)):
     user = db.query(User).filter(User.username == body.username).first()
-    if not user or not verify_password(body.password, user.password_hash):
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
     return {"ok": True}
