@@ -40,12 +40,12 @@ VITE_API_BASE_URL=https://your-backend-url.railway.app
 
 ---
 
-## 🔧 **2단계: 백엔드 배포 (Railway)**
+## 🔧 **2단계: 백엔드 배포 (Render - 무료)**
 
-### **2.1 Railway 계정 생성**
-1. [Railway](https://railway.app) 접속
+### **2.1 Render 계정 생성**
+1. [Render](https://render.com) 접속
 2. GitHub 계정으로 로그인
-3. "Start a New Project" 클릭
+3. "New +" → "Web Service" 클릭
 
 ### **2.2 프로젝트 연결**
 ```bash
@@ -66,9 +66,10 @@ CORS_ORIGINS=https://chamchisangsa.github.io
 ```
 
 ### **2.4 PostgreSQL 데이터베이스 추가**
-1. "New" → "Database" → "PostgreSQL"
-2. 자동 생성된 DATABASE_URL 환경 변수 확인
-3. 데이터베이스 연결 테스트
+1. "New +" → "PostgreSQL"
+2. **무료 플랜 선택** (월 1GB, 90일)
+3. 자동 생성된 DATABASE_URL 환경 변수 확인
+4. 백엔드 서비스에 연결
 
 ---
 
@@ -124,12 +125,12 @@ https://chamchisangsa.github.io/assistant-ai/
 
 ### **5.2 백엔드 API URL**
 ```
-https://assistant-ai-backend.railway.app
+https://assistant-ai-backend.onrender.com
 ```
 
 ### **5.3 API 문서**
 ```
-https://assistant-ai-backend.railway.app/docs
+https://assistant-ai-backend.onrender.com/docs
 ```
 
 ---

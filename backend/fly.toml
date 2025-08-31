@@ -1,0 +1,31 @@
+app = "assistant-ai-backend"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  ENVIRONMENT = "production"
+  ALGORITHM = "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES = "30"
+  CORS_ORIGINS = "https://chamchisangsa.github.io"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+[machine]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
