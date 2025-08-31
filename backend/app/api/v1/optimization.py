@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.services.optimization import ScheduleOptimizer
 from app.api.v1.auth import get_current_user
-from app.schemas.optimization import OptimizationRequest, OptimizationResponse
+from app.schemas.optimization import OptimizationRequest, OptimizationResponse, SuggestionRequest, SuggestionResponse
 
 router = APIRouter()
 optimizer = ScheduleOptimizer()
@@ -53,13 +53,52 @@ async def optimize_schedule(
             detail=f"일정 최적화 중 오류가 발생했습니다: {str(e)}"
         )
 
+@router.post("/suggest-schedules", response_model=SuggestionResponse)
+async def suggest_schedules(
+    request: SuggestionRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """빈 시간대를 기반으로 일정 제안"""
+    try:
+        print(f"=== AI 일정 제안 요청 디버깅 ===")
+        print(f"사용자: {current_user.email}, 지역구: {current_user.district}, 활동강도: {current_user.activity_level}")
+        print(f"빈 시간대 수: {len(request.empty_time_slots)}")
+        print(f"첫 번째 시간대: {request.empty_time_slots[0] if request.empty_time_slots else 'None'}")
+        print(f"주 시작일: {request.current_week_start}")
+        
+        # AI 일정 제안 생성
+        suggestions = optimizer.suggest_schedules_for_empty_slots(
+            user=current_user,
+            empty_time_slots=request.empty_time_slots,
+            current_week_start=request.current_week_start
+        )
+        
+        print(f"생성된 제안 수: {len(suggestions)}")
+        if suggestions:
+            print(f"첫 번째 제안: {suggestions[0]}")
+        else:
+            print("❌ AI 제안이 생성되지 않았습니다!")
+        
+        return SuggestionResponse(
+            success=True,
+            message="일정 제안이 생성되었습니다",
+            suggestions=suggestions,
+            total_suggestions=len(suggestions)
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"일정 제안 생성 중 오류가 발생했습니다: {str(e)}"
+        )
+
 @router.post("/reoptimize-schedule", response_model=OptimizationResponse)
 async def reoptimize_schedule(
     request: OptimizationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """실시간 일정 재최적화"""
+    
     try:
         # 현재 진행 중인 일정 조회
         from app.models.schedule import Schedule
@@ -106,12 +145,7 @@ async def get_location_statistics(district: str):
     """지역구별 장소 통계"""
     try:
         stats = optimizer.get_location_statistics(district)
-        if not stats:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 지역구를 찾을 수 없습니다"
-            )
-        return stats
+        return {"district": district, "statistics": stats}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

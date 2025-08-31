@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 
 // Lazy-loaded components
 const Auth = lazy(() => import("./components/auth/Auth"));
@@ -16,18 +17,23 @@ function App() {
         <Router>
             <AuthProvider>
                 <OnboardingProvider>
-                    <Suspense fallback={<div>Loading...</div>}>
-                        <Routes>
-                            <Route path="/login" element={<Auth />} />
-                            <Route
-                                path="/onboarding"
-                                element={<OnboardingWizard />}
-                            />
-                            <Route path="/schedule" element={<Schedule />} />
-                            <Route path="/map" element={<Map />} />
-                            <Route path="/" element={<Schedule />} />
-                        </Routes>
-                    </Suspense>
+                    <NotificationProvider>
+                        <Suspense fallback={<div>Loading...</div>}>
+                            <Routes>
+                                <Route path="/login" element={<Auth />} />
+                                <Route
+                                    path="/onboarding"
+                                    element={<OnboardingWizard />}
+                                />
+                                <Route
+                                    path="/schedule"
+                                    element={<Schedule />}
+                                />
+                                <Route path="/map" element={<Map />} />
+                                <Route path="/" element={<Schedule />} />
+                            </Routes>
+                        </Suspense>
+                    </NotificationProvider>
                 </OnboardingProvider>
             </AuthProvider>
         </Router>

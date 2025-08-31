@@ -15,6 +15,7 @@ def create_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 한국 시간을 그대로 저장 (UTC 변환 없음)
     db_schedule = Schedule(
         **schedule.dict(),
         user_id=current_user.id
@@ -60,6 +61,7 @@ def update_schedule(
     if not db_schedule:
         raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다")
     
+    # 한국 시간을 그대로 업데이트 (UTC 변환 없음)
     for field, value in schedule_update.dict(exclude_unset=True).items():
         setattr(db_schedule, field, value)
     

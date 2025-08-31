@@ -22,6 +22,9 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+// Default export for the api instance
+export default api;
+
 export const schedulesAPI = {
     list: async () => {
         const { data } = await api.get("/api/v1/schedules");

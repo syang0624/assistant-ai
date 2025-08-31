@@ -300,3 +300,213 @@ class ScheduleOptimizer:
             stats["by_type"][loc_type]["total_exposure"] += loc["exposure"]
         
         return stats
+
+    def _calculate_time_weight_extended(self, time: datetime) -> float:
+        """시간대별 가중치 계산 (05:00-22:00 범위)"""
+        hour = time.hour
+        
+        if 5 <= hour < 9:  # 오전 5시 ~ 9시 전
+            return 1.0
+        elif 9 <= hour < 12:  # 오전 9시 ~ 12시 전
+            return 1.5
+        elif 12 <= hour < 14:  # 오전 12시 ~ 오후 2시 전
+            return 2.0
+        elif 14 <= hour < 17:  # 오후 2시 ~ 오후 5시 전
+            return 1.5
+        elif 17 <= hour < 22:  # 오후 5시 ~ 오후 10시 전
+            return 1.0
+        else:  # 오후 10시 이후
+            return 0.5
+
+    def suggest_schedules_for_empty_slots(self, user: User, empty_time_slots: List, current_week_start: str = None) -> List[Dict]:
+        """빈 시간대를 기반으로 AI 일정 제안 생성"""
+        if not empty_time_slots:
+            return []
+        
+        # 사용자 지역구의 장소들 가져오기
+        user_district = user.district
+        
+        # 지역구 매핑 로직
+        if "군포시" in user_district:
+            location_district = "군포시"
+        elif "서대문구" in user_district:
+            location_district = "서대문구"
+        else:
+            location_district = user_district
+            
+        district_locations = self.locations.get(location_district, [])
+        print(f"지역구 '{user_district}' -> 매핑된 지역구 '{location_district}'의 총 장소 수: {len(district_locations)}")
+        
+        if not district_locations:
+            print(f"❌ 지역구 '{location_district}'에 장소 데이터가 없습니다")
+            return []
+        
+        # 활동 강도 규칙 적용
+        rules = self.activity_rules.get(user.activity_level, self.activity_rules["medium"])
+        
+        # 현재 시간 기준으로 과거 시간대 완전 차단
+        now = datetime.now()
+        current_time_plus_buffer = now + timedelta(hours=2)  # 2시간 여유 (준비 시간 확보)
+        print(f"현재 시간: {now}, 최소 허용 시간: {current_time_plus_buffer}")
+        
+        # 과거가 아닌 시간대만 필터링 (엄격한 검증)
+        valid_time_slots = []
+        for time_slot in empty_time_slots:
+            if hasattr(time_slot, 'start'):
+                slot_start_str = time_slot.start
+            else:
+                slot_start_str = time_slot["start"]
+            
+            # 프론트엔드에서 보낸 한국 시간을 파싱
+            slot_start = datetime.fromisoformat(slot_start_str)
+            
+            # 현재 시간 + 2시간 이후의 시간대만 포함 (엄격한 검증)
+            if slot_start >= current_time_plus_buffer:
+                valid_time_slots.append(time_slot)
+                print(f"✅ 유효한 시간대: {slot_start}")
+            else:
+                print(f"❌ 과거/너무 가까운 시간대 제외: {slot_start}")
+        
+        print(f"유효한 시간대 수 (과거 완전 차단): {len(valid_time_slots)}")
+        
+        if not valid_time_slots:
+            print("❌ 유효한 시간대가 없습니다 (모든 시간대가 과거)")
+            return []
+        
+        # 시간대별로 장소를 분산 배치하기 위한 그룹화
+        time_groups = {}
+        for time_slot in valid_time_slots:
+            if hasattr(time_slot, 'start'):
+                slot_start_str = time_slot.start
+            else:
+                slot_start_str = time_slot["start"]
+            
+            # 시간을 파싱해서 날짜별로 그룹화
+            slot_start = datetime.fromisoformat(slot_start_str)
+            day_key = slot_start.strftime("%Y-%m-%d")  # 날짜를 키로 사용
+            
+            if day_key not in time_groups:
+                time_groups[day_key] = []
+            time_groups[day_key].append(time_slot)
+        
+        print(f"날짜별 그룹: {list(time_groups.keys())}")
+        
+        # 3-5일에 걸쳐 균등 분산 (하루 최대 1개)
+        max_per_day = 1  # 하루 최대 1개로 제한하여 균등 분산
+        target_days = min(5, len(time_groups))  # 최대 5일까지
+        total_suggestions = 0
+        suggestions = []
+        used_locations = set()  # 중복 방지를 위한 사용된 장소 추적
+        
+        # 날짜순으로 정렬하여 순서대로 처리
+        sorted_days = sorted(time_groups.keys())
+        
+        for day_key in sorted_days:
+            if total_suggestions >= rules["max_schedules"] or total_suggestions >= target_days:
+                break
+                
+            day_slots = time_groups[day_key]
+            print(f"📅 {day_key} 처리 중...")
+            day_suggestions = []
+            day_used_locations = set()
+            
+            # 해당 날짜의 시간대를 시간순으로 정렬
+            sorted_slots = sorted(day_slots, key=lambda x: x.start if hasattr(x, 'start') else x["start"])
+            
+            # 하루에 최대 1개까지만 제안 (균등 분산)
+            for time_slot in sorted_slots:
+                if len(day_suggestions) >= max_per_day:
+                    break
+                    
+                # Pydantic 모델 또는 딕셔너리 모두 처리
+                if hasattr(time_slot, 'start'):
+                    slot_start_str = time_slot.start
+                    slot_end_str = time_slot.end
+                else:
+                    slot_start_str = time_slot["start"]
+                    slot_end_str = time_slot["end"]
+                
+                # 프론트엔드에서 보낸 한국 시간을 파싱
+                slot_start = datetime.fromisoformat(slot_start_str)
+                slot_end = datetime.fromisoformat(slot_end_str)
+                slot_duration = (slot_end - slot_start).total_seconds() / 60  # 분 단위
+                
+                print(f"  시간대: {slot_start.strftime('%H:%M')} - {slot_end.strftime('%H:%M')} (지속: {slot_duration}분)")
+                
+                # 시간대별 가중치 계산 (05:00-22:00 범위)
+                time_weight = self._calculate_time_weight_extended(slot_start)
+                
+                # 장소별 점수 계산 및 우선순위 큐 생성
+                location_scores = []
+                for idx, loc in enumerate(district_locations):
+                    # 이미 사용된 장소는 제외 (다양성 확보)
+                    if loc["name"] in used_locations or loc["name"] in day_used_locations:
+                        continue
+                        
+                    # 우선순위 점수 계산 (우선순위 + 노출도 + 시간대별 가중치)
+                    priority_score = loc["priority"] * 10
+                    exposure_score = loc["exposure"] * 0.1
+                    total_score = priority_score + exposure_score + time_weight
+                    
+                    # 음수 점수로 heapq 최대 힙 구현 (가장 높은 점수가 먼저 나오도록)
+                    # idx를 추가하여 동일한 점수일 때도 비교 가능하도록 함
+                    heapq.heappush(location_scores, (-total_score, idx, loc))
+                
+                # 상위 1개 장소만 선택 (균등 분산)
+                selected_locations = []
+                for _ in range(min(1, len(location_scores))):
+                    if not location_scores:
+                        break
+                        
+                    score, idx, location = heapq.heappop(location_scores)
+                    score = -score  # 음수에서 양수로 변환
+                    
+                    # 일정 시간 계산
+                    schedule_duration = self._calculate_schedule_duration(location["type"])
+                    
+                    # 시간 제약 확인 (빈 시간대에 맞는지)
+                    if schedule_duration <= slot_duration:
+                        # 이동 시간 고려하여 실제 일정 시간 계산
+                        travel_time = 0
+                        travel_distance = 0
+                        
+                        # 일정 제안 생성
+                        suggestion = {
+                            "title": f"{location['name']} 방문",
+                            "start_time": slot_start.strftime("%Y-%m-%dT%H:%M:%S"),  # 한국 시간 형식
+                            "end_time": (slot_start + timedelta(minutes=schedule_duration)).strftime("%Y-%m-%dT%H:%M:%S"),
+                            "location": location["name"],
+                            "address": location["address"],
+                            "location_type": location["type"],
+                            "priority": location["priority"],
+                            "exposure": location["exposure"],
+                            "travel_time": travel_time,
+                            "travel_distance": travel_distance,
+                            "description": f"{location['type']} 시설 방문으로 유권자 접촉 기회 확대",
+                            "score": score,
+                            "day": slot_start.strftime("%m월 %d일 (%A)")  # 날짜+요일 표시
+                        }
+                        
+                        selected_locations.append(suggestion)
+                        print(f"    ✅ 제안 생성: {location['name']} ({slot_start.strftime('%H:%M')})")
+                        break  # 한 시간대당 1개만 제안
+                
+                # 해당 시간대의 제안 추가
+                if selected_locations:
+                    best_suggestion = selected_locations[0]
+                    day_suggestions.append(best_suggestion)
+                    day_used_locations.add(best_suggestion["location"])  # 해당 날짜에서 사용된 장소 기록
+                    used_locations.add(best_suggestion["location"])  # 전체에서 사용된 장소 기록
+            
+            # 해당 날짜의 제안들을 suggestions에 추가
+            suggestions.extend(day_suggestions)
+            total_suggestions += len(day_suggestions)
+            print(f"  📊 {day_key}: {len(day_suggestions)}개 제안")
+        
+        print(f"🎯 총 생성된 제안 수: {len(suggestions)}")
+        if suggestions:
+            print(f"📋 첫 번째 제안: {suggestions[0]}")
+        
+        # 전체 제안 수를 활동 강도에 맞게 조정
+        max_suggestions = min(rules["max_schedules"], len(suggestions))
+        return suggestions[:max_suggestions]
