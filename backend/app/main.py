@@ -19,6 +19,8 @@ origins = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    # 프로덕션 도메인 (Vercel 배포 후 추가)
+    # "https://assistant-ai-xxx.vercel.app",
 ]
 
 app.add_middleware(
