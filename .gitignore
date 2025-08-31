@@ -1,0 +1,34 @@
+# Local config & IDE
+.cursor
+.vooster
+.DS_Store
+.idea/
+.vscode/
+
+# Node / React
+node_modules/
+dist/
+build/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+.mypy_cache/
+pytest_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Databases
+*.sqlite
+*.sqlite3
