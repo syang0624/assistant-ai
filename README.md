@@ -28,8 +28,28 @@ docker-compose up -d
 
 ### 프로덕션 배포
 
+#### **GitHub Pages (프론트엔드)**
+
 ```bash
-# 배포 스크립트 실행
+# GitHub Pages 자동 배포
+# main 브랜치에 push하면 자동으로 배포됩니다
+git push origin main
+
+# 배포된 사이트
+# https://chamchisangsa.github.io/assistant-ai/
+```
+
+#### **Railway (백엔드)**
+
+```bash
+# Railway에서 백엔드 배포
+# https://railway.app 에서 프로젝트 연결
+```
+
+#### **로컬 배포**
+
+```bash
+# 로컬 Docker 배포
 chmod +x deploy.sh
 ./deploy.sh
 
